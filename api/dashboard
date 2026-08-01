@@ -38,9 +38,7 @@ function readConfig() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!url || !key) {
-    return null;
-  }
+  if (!url || !key) return null;
 
   return {
     url: url.replace(/\/$/, ""),
@@ -116,9 +114,7 @@ async function fetchAll(config, path) {
 
     rows.push(...page);
 
-    if (page.length < PAGE_SIZE) {
-      return rows;
-    }
+    if (page.length < PAGE_SIZE) return rows;
   }
 }
 
@@ -149,20 +145,8 @@ function buildCatalog(records) {
     currentShare: total ? (current / total) * 100 : 0,
     retainedShare: total ? (retained / total) * 100 : 0,
     rows: [
-      {
-        source: "Catalogo operacional",
-        status: "Atualizado pela API",
-        count: current,
-        share: share(current, total),
-        tone: "good",
-      },
-      {
-        source: "Catalogo preservado",
-        status: "Mantido para analise",
-        count: retained,
-        share: share(retained, total),
-        tone: "warning",
-      },
+      { source: "Catalogo operacional", status: "Atualizado pela API", count: current, share: share(current, total), tone: "good" },
+      { source: "Catalogo preservado", status: "Mantido para analise", count: retained, share: share(retained, total), tone: "warning" },
     ],
   };
 }
@@ -227,29 +211,27 @@ function buildTopProducts(records) {
     .slice(0, 12);
 }
 
-function json(payload) {
-  return Response.json(payload, {
-    headers: {
-      "cache-control": "no-store",
-    },
-  });
+function sendJson(response, status, payload) {
+  response.statusCode = status;
+  response.setHeader("Cache-Control", "no-store");
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.end(JSON.stringify(payload));
 }
 
-export default async function handler(request) {
-  const url = new URL(request.url);
-  const requestedPeriod = Number(url.searchParams.get("periodDays") || 30);
+module.exports = async function handler(request, response) {
+  const requestedPeriod = Number(request.query.periodDays || 30);
   const periodDays = [7, 30, 90].includes(requestedPeriod) ? requestedPeriod : 30;
   const config = readConfig();
 
   if (!config) {
-    return json({ ...fallback, periodDays });
+    return sendJson(response, 200, { ...fallback, periodDays });
   }
 
   try {
     const account = await getAccount(config);
 
     if (!account) {
-      return json({
+      return sendJson(response, 200, {
         ...fallback,
         periodDays,
         message: `Conta "${config.accountName}" nao encontrada no Supabase.`,
@@ -259,35 +241,24 @@ export default async function handler(request) {
     const accountFilter = `eq.${account.id}`;
     const fromDate = isoDateNDaysAgo(periodDays);
     const [catalogRecords, summaryRecords, performanceRecords] = await Promise.all([
-      fetchAll(
-        config,
-        appendQuery("dashboard_item_catalog", {
-          select: "item_id,catalog_source",
-          account_id: accountFilter,
-        }),
-      ),
-      fetchAll(
-        config,
-        appendQuery("dashboard_daily_account_summary", {
-          select:
-            "performance_date,visits,units_sold,orders_count,gross_amount,paid_gross_amount,avg_ticket,conversion_rate_percent",
-          account_id: accountFilter,
-          performance_date: `gte.${fromDate}`,
-          order: "performance_date.asc",
-        }),
-      ),
-      fetchAll(
-        config,
-        appendQuery("dashboard_daily_item_performance", {
-          select:
-            "item_id,title,catalog_source,visits,units_sold,orders_count,gross_amount,conversion_rate_percent",
-          account_id: accountFilter,
-          performance_date: `gte.${fromDate}`,
-        }),
-      ),
+      fetchAll(config, appendQuery("dashboard_item_catalog", {
+        select: "item_id,catalog_source",
+        account_id: accountFilter,
+      })),
+      fetchAll(config, appendQuery("dashboard_daily_account_summary", {
+        select: "performance_date,visits,units_sold,orders_count,gross_amount,paid_gross_amount,avg_ticket,conversion_rate_percent",
+        account_id: accountFilter,
+        performance_date: `gte.${fromDate}`,
+        order: "performance_date.asc",
+      })),
+      fetchAll(config, appendQuery("dashboard_daily_item_performance", {
+        select: "item_id,title,catalog_source,visits,units_sold,orders_count,gross_amount,conversion_rate_percent",
+        account_id: accountFilter,
+        performance_date: `gte.${fromDate}`,
+      })),
     ]);
 
-    return json({
+    return sendJson(response, 200, {
       source: "supabase",
       connected: true,
       message: null,
@@ -298,10 +269,10 @@ export default async function handler(request) {
       topProducts: buildTopProducts(performanceRecords),
     });
   } catch (error) {
-    return json({
+    return sendJson(response, 200, {
       ...fallback,
       periodDays,
       message: error instanceof Error ? error.message : "Erro desconhecido ao consultar Supabase.",
     });
   }
-}
+};
