@@ -124,13 +124,13 @@
           <div class="brand-caption">Mercado Livre Analytics</div>
         </div>
         <nav>
-          <p class="nav-label">Analises</p>
+          <p class="nav-label">Análises</p>
           <div class="nav">
-            <button class="active">Visao geral</button>
-            <button>Vendas</button>
-            <button>Produtos e anuncios</button>
-            <button>Performance</button>
-            <button>Trafego e conversao</button>
+            <button class="active" type="button" data-view="overview">Visão geral</button>
+            <button type="button" data-view="sales">Vendas</button>
+            <button type="button" data-view="products">Produtos e anúncios</button>
+            <button type="button" data-view="performance">Performance</button>
+            <button type="button" data-view="traffic">Tráfego e conversão</button>
           </div>
         </nav>
         <div class="footer">
@@ -147,7 +147,7 @@
           </div>
           <div class="top-actions">
             <span id="sync-state" class="sync warning">Carregando</span>
-            <div class="periods" aria-label="Periodo">
+            <div class="periods" aria-label="Período">
               <button data-period="7">7d</button>
               <button data-period="30" class="active">30d</button>
               <button data-period="90">90d</button>
@@ -160,52 +160,52 @@
           <div class="title-row">
             <div>
               <p class="eyebrow">PC Express | Mercado Livre</p>
-              <h1>Visao geral</h1>
-              <p class="subtitle">Leitura executiva da operacao, com catalogo consolidado e dados auditaveis.</p>
+              <h1 id="view-title">Visão geral</h1>
+              <p id="view-subtitle" class="subtitle">Leitura executiva da operação, com catálogo consolidado e dados auditáveis.</p>
             </div>
             <div class="date-chip">Janela selecionada: <strong id="period-label">30 dias</strong></div>
           </div>
 
           <section class="kpis">
-            <article class="kpi brand"><span>Catalogo consolidado</span><strong id="catalog-total">-</strong><small id="catalog-detail">-</small></article>
+            <article class="kpi brand"><span>Catálogo consolidado</span><strong id="catalog-total">-</strong><small id="catalog-detail">-</small></article>
             <article class="kpi"><span>Pedidos</span><strong id="orders-count">-</strong><small id="orders-detail">-</small></article>
-            <article class="kpi good"><span>Unidades vendidas</span><strong id="units-sold">-</strong><small>Vinculadas ao catalogo consolidado</small></article>
+            <article class="kpi good"><span>Unidades vendidas</span><strong id="units-sold">-</strong><small>Vinculadas ao catálogo consolidado</small></article>
             <article class="kpi warning"><span>Valor bruto</span><strong id="gross-amount">-</strong><small id="gross-detail">-</small></article>
           </section>
 
           <section class="grid">
             <article class="panel">
-              <h2>Cobertura do catalogo</h2>
-              <p>A visao principal trata tudo como um catalogo unico; a origem fica disponivel para auditoria e regras operacionais.</p>
+              <h2 id="primary-panel-title">Cobertura do catálogo</h2>
+              <p id="primary-panel-description">A visão principal trata tudo como um catálogo único; a origem fica disponível para auditoria e regras operacionais.</p>
               <div class="coverage-bar">
                 <span id="coverage-current" class="coverage-current"></span>
                 <span id="coverage-retained" class="coverage-retained"></span>
               </div>
               <div class="legend">
-                <span>Catalogo operacional <b id="current-share">-</b></span>
-                <span>Catalogo preservado <b id="retained-share">-</b></span>
+                <span>Catálogo operacional <b id="current-share">-</b></span>
+                <span>Catálogo preservado <b id="retained-share">-</b></span>
               </div>
               <div class="numbers">
-                <div><strong id="current-count">-</strong><span>Anuncios operacionais</span></div>
-                <div><strong id="retained-count">-</strong><span>Anuncios preservados</span></div>
-                <div><strong id="unknown-count">-</strong><span>Itens sem classificacao</span></div>
+                <div><strong id="current-count">-</strong><span>Anúncios operacionais</span></div>
+                <div><strong id="retained-count">-</strong><span>Anúncios preservados</span></div>
+                <div><strong id="unknown-count">-</strong><span>Itens sem classificação</span></div>
               </div>
             </article>
 
             <article class="panel">
-              <h2>Leitura para decisao</h2>
-              <p>O que merece atencao agora.</p>
+              <h2 id="secondary-panel-title">Leitura para decisão</h2>
+              <p id="secondary-panel-description">O que merece atenção agora.</p>
               <ul class="decision">
-                <li><strong id="decision-1">-</strong><span>Estoque e status atuais entram apenas no catalogo operacional.</span></li>
-                <li><strong id="decision-2">-</strong><span>Nenhuma venda precisa ficar fora da leitura comercial.</span></li>
-                <li><strong id="decision-3">-</strong><span>As origens ficam disponiveis como auditoria tecnica.</span></li>
+                <li><strong id="decision-1">-</strong><span id="decision-desc-1">Estoque e status atuais entram apenas no catálogo operacional.</span></li>
+                <li><strong id="decision-2">-</strong><span id="decision-desc-2">Nenhuma venda precisa ficar fora da leitura comercial.</span></li>
+                <li><strong id="decision-3">-</strong><span id="decision-desc-3">As origens ficam disponíveis como auditoria técnica.</span></li>
               </ul>
             </article>
           </section>
 
           <section class="panel">
-            <h2>Top produtos por valor bruto</h2>
-            <p>Produtos agregados pela view diaria do Supabase. Quando nao houver conexao, esta tabela fica aguardando os dados reais.</p>
+            <h2 id="table-title">Top produtos por valor bruto</h2>
+            <p id="table-description">Produtos agregados pela visão diária do Supabase. Quando não houver conexão, esta tabela fica aguardando os dados reais.</p>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -227,11 +227,66 @@
 
     <script>
       let currentPeriod = 30;
+      let currentView = "overview";
+      let latestDashboard = null;
+
+      const views = {
+        overview: {
+          title: "Visão geral",
+          subtitle: "Leitura executiva da operação, com catálogo consolidado e dados auditáveis.",
+          primaryTitle: "Cobertura do catálogo",
+          primaryDescription: "A visão principal trata tudo como um catálogo único; a origem fica disponível para auditoria e regras operacionais.",
+          secondaryTitle: "Leitura para decisão",
+          secondaryDescription: "O que merece atenção agora.",
+          tableTitle: "Top produtos por valor bruto",
+          tableDescription: "Produtos agregados pela visão diária do Supabase. Quando não houver conexão, esta tabela usa dados fictícios para teste local.",
+        },
+        sales: {
+          title: "Vendas",
+          subtitle: "Resumo comercial da janela selecionada, com pedidos, unidades e valor bruto.",
+          primaryTitle: "Cobertura usada nas vendas",
+          primaryDescription: "As vendas são lidas contra o catálogo consolidado para preservar o histórico comercial.",
+          secondaryTitle: "Pontos de atenção",
+          secondaryDescription: "Sinais rápidos para acompanhar a evolução da receita.",
+          tableTitle: "Produtos com maior receita",
+          tableDescription: "Ranking fictício por valor bruto para validar a tabela antes da conexão final.",
+        },
+        products: {
+          title: "Produtos e anúncios",
+          subtitle: "Acompanhamento do catálogo operacional e dos anúncios preservados para análise.",
+          primaryTitle: "Distribuição dos anúncios",
+          primaryDescription: "A separação entre operacional e preservado ajuda a diferenciar ações atuais de histórico.",
+          secondaryTitle: "Qualidade do catálogo",
+          secondaryDescription: "Checklist visual para revisar classificação, cobertura e dados herdados.",
+          tableTitle: "Produtos em destaque",
+          tableDescription: "Lista fictícia com nomes longos para testar quebra de texto e rolagem horizontal.",
+        },
+        performance: {
+          title: "Performance",
+          subtitle: "Indicadores de eficiência comercial para priorizar melhorias na operação.",
+          primaryTitle: "Base de performance",
+          primaryDescription: "A cobertura do catálogo define o universo analisado nos indicadores de performance.",
+          secondaryTitle: "Diagnóstico rápido",
+          secondaryDescription: "Leitura objetiva para orientar testes, estoque e anúncios prioritários.",
+          tableTitle: "Produtos para acompanhar",
+          tableDescription: "Produtos simulados ordenados por impacto financeiro e conversão.",
+        },
+        traffic: {
+          title: "Tráfego e conversão",
+          subtitle: "Visitas, pedidos e conversão em uma leitura simples para acompanhar demanda.",
+          primaryTitle: "Origem da leitura",
+          primaryDescription: "A base consolidada permite comparar tráfego atual com histórico comercial preservado.",
+          secondaryTitle: "Funil comercial",
+          secondaryDescription: "Sinais para avaliar se o tráfego está se transformando em pedidos.",
+          tableTitle: "Produtos por interesse",
+          tableDescription: "Ranking fictício combinando visitas, unidades vendidas e conversão.",
+        },
+      };
 
       const $ = (id) => document.getElementById(id);
       const number = (value) => new Intl.NumberFormat("pt-BR").format(value || 0);
       const currency = (value) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
-      const percent = (value) => value === null || value === undefined ? "Apos conexao" : `${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+      const percent = (value) => value === null || value === undefined ? "Após conexão" : `${Number(value).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
       const shortCurrency = (value) => {
         if ((value || 0) >= 1000000) return `R$ ${(value / 1000000).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} mi`;
         if ((value || 0) >= 1000) return `R$ ${(value / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mil`;
@@ -254,7 +309,68 @@
         $("top-products").innerHTML = rows;
       }
 
+      function renderView(data) {
+        const view = views[currentView] || views.overview;
+
+        $("view-title").textContent = view.title;
+        $("view-subtitle").textContent = view.subtitle;
+        $("primary-panel-title").textContent = view.primaryTitle;
+        $("primary-panel-description").textContent = view.primaryDescription;
+        $("secondary-panel-title").textContent = view.secondaryTitle;
+        $("secondary-panel-description").textContent = view.secondaryDescription;
+        $("table-title").textContent = view.tableTitle;
+        $("table-description").textContent = view.tableDescription;
+
+        if (currentView === "sales") {
+          $("decision-1").textContent = `${number(data.sales.ordersCount)} pedidos no período`;
+          $("decision-desc-1").textContent = "Use esta aba para validar os principais números comerciais.";
+          $("decision-2").textContent = `${number(data.sales.unitsSold)} unidades vendidas`;
+          $("decision-desc-2").textContent = "A leitura acompanha volume além do valor bruto.";
+          $("decision-3").textContent = shortCurrency(data.sales.grossAmount);
+          $("decision-desc-3").textContent = "Valor bruto simulado para testar o painel antes do deploy.";
+          return;
+        }
+
+        if (currentView === "products") {
+          $("decision-1").textContent = `${number(data.catalog.current)} anúncios operacionais`;
+          $("decision-desc-1").textContent = "Itens atuais para ações de estoque, preço e status.";
+          $("decision-2").textContent = `${number(data.catalog.retained)} anúncios preservados`;
+          $("decision-desc-2").textContent = "Histórico mantido para não perder vendas antigas.";
+          $("decision-3").textContent = data.catalog.unknown === 0 ? "Catálogo classificado" : "Revisar classificação";
+          $("decision-desc-3").textContent = "A origem continua disponível como auditoria técnica.";
+          return;
+        }
+
+        if (currentView === "performance") {
+          $("decision-1").textContent = `${percent(data.sales.conversionRatePercent)} de conversão`;
+          $("decision-desc-1").textContent = "Métrica fictícia para validar a área de performance.";
+          $("decision-2").textContent = currency(data.sales.avgTicket);
+          $("decision-desc-2").textContent = "Ticket médio usado como referência comercial.";
+          $("decision-3").textContent = `${data.topProducts?.length || 0} produtos monitorados`;
+          $("decision-desc-3").textContent = "A tabela ajuda a enxergar onde priorizar melhorias.";
+          return;
+        }
+
+        if (currentView === "traffic") {
+          $("decision-1").textContent = `${number(data.sales.visits)} visitas`;
+          $("decision-desc-1").textContent = "Volume fictício para testar leitura de topo de funil.";
+          $("decision-2").textContent = `${percent(data.sales.conversionRatePercent)} de conversão`;
+          $("decision-desc-2").textContent = "Ajuda a comparar interesse com pedidos gerados.";
+          $("decision-3").textContent = `${number(data.sales.ordersCount)} pedidos`;
+          $("decision-desc-3").textContent = "Fechamento do funil na janela selecionada.";
+          return;
+        }
+
+        $("decision-1").textContent = `${data.catalog.rows[1]?.share || "0,0%"} do catálogo é preservado`;
+        $("decision-desc-1").textContent = "Estoque e status atuais entram apenas no catálogo operacional.";
+        $("decision-2").textContent = data.catalog.unknown === 0 ? "100% dos itens estão classificados" : "Há itens para revisar";
+        $("decision-desc-2").textContent = "Nenhuma venda precisa ficar fora da leitura comercial.";
+        $("decision-3").textContent = data.connected ? "Supabase conectado" : "Base pronta para conectar";
+        $("decision-desc-3").textContent = "As origens ficam disponíveis como auditoria técnica.";
+      }
+
       function render(data) {
+        latestDashboard = data;
         $("account-name").textContent = data.accountName || "PC Express";
         $("period-label").textContent = `${data.periodDays} dias`;
         $("catalog-total").textContent = number(data.catalog.total);
@@ -263,7 +379,7 @@
         $("orders-detail").textContent = `Janela de ${data.periodDays} dias`;
         $("units-sold").textContent = number(data.sales.unitsSold);
         $("gross-amount").textContent = shortCurrency(data.sales.grossAmount);
-        $("gross-detail").textContent = data.connected ? "Periodo selecionado" : "Snapshot validado";
+        $("gross-detail").textContent = data.connected ? "Período selecionado" : "Snapshot validado";
 
         $("coverage-current").style.width = `${data.catalog.currentShare || 0}%`;
         $("coverage-retained").style.width = `${data.catalog.retainedShare || 0}%`;
@@ -273,23 +389,68 @@
         $("retained-count").textContent = number(data.catalog.retained);
         $("unknown-count").textContent = number(data.catalog.unknown);
 
-        $("decision-1").textContent = `${data.catalog.rows[1]?.share || "0,0%"} do catalogo e preservado`;
-        $("decision-2").textContent = data.catalog.unknown === 0 ? "100% dos itens estao classificados" : "Ha itens para revisar";
-        $("decision-3").textContent = data.connected ? "Supabase conectado" : "Base pronta para conectar";
-
         $("footer-title").textContent = data.connected ? "Supabase conectado" : "Dados de fallback";
         $("footer-message").textContent = data.message || "Dados operacionais";
         $("sync-state").textContent = data.connected ? "Supabase ativo" : "Fallback local";
         $("sync-state").className = data.connected ? "sync" : "sync warning";
 
+        renderView(data);
         renderProducts(data.topProducts || []);
       }
 
+      function renderError(error) {
+        render({
+          source: "fallback",
+          connected: false,
+          message: error.message || "Erro ao carregar /api/dashboard",
+          accountName: "PC Express",
+          periodDays: currentPeriod,
+          catalog: {
+            total: 277,
+            current: 174,
+            retained: 103,
+            unknown: 0,
+            currentShare: 62.8,
+            retainedShare: 37.2,
+            rows: [
+              { source: "Catálogo operacional", status: "Atualizado pela API", count: 174, share: "62,8%", tone: "good" },
+              { source: "Catálogo preservado", status: "Mantido para análise", count: 103, share: "37,2%", tone: "warning" }
+            ]
+          },
+          sales: {
+            visits: null,
+            unitsSold: 1044,
+            ordersCount: 898,
+            grossAmount: 1763179.84,
+            paidGrossAmount: null,
+            avgTicket: 1963.45,
+            conversionRatePercent: null,
+            firstPerformanceDate: null,
+            lastPerformanceDate: "2026-02-25"
+          },
+          topProducts: []
+        });
+      }
+
       async function loadDashboard() {
-        $("sync-state").textContent = "Carregando";
-        const response = await fetch(`/api/dashboard?periodDays=${currentPeriod}`, { cache: "no-store" });
-        const data = await response.json();
-        render(data);
+        try {
+          $("sync-state").textContent = "Carregando";
+          const response = await fetch(`/api/dashboard?periodDays=${currentPeriod}`, { cache: "no-store" });
+          const contentType = response.headers.get("content-type") || "";
+
+          if (!response.ok) {
+            throw new Error(`API retornou HTTP ${response.status}`);
+          }
+
+          if (!contentType.includes("application/json")) {
+            throw new Error(`API retornou ${contentType || "tipo desconhecido"}, não JSON`);
+          }
+
+          const data = await response.json();
+          render(data);
+        } catch (error) {
+          renderError(error);
+        }
       }
 
       document.querySelectorAll("[data-period]").forEach((button) => {
@@ -298,6 +459,15 @@
           document.querySelectorAll("[data-period]").forEach((item) => item.classList.remove("active"));
           button.classList.add("active");
           loadDashboard();
+        });
+      });
+
+      document.querySelectorAll("[data-view]").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentView = button.dataset.view || "overview";
+          document.querySelectorAll("[data-view]").forEach((item) => item.classList.remove("active"));
+          button.classList.add("active");
+          if (latestDashboard) renderView(latestDashboard);
         });
       });
 
