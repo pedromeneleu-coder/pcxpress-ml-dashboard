@@ -1,0 +1,300 @@
+const DEFAULT_ACCOUNT_NAME = "PC Express";
+const DEFAULT_SCHEMA = "ml_dashboards";
+const PAGE_SIZE = 1000;
+
+function readConfig() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    return null;
+  }
+
+  return {
+    url: url.replace(/\/$/, ""),
+    key,
+    schema: process.env.SUPABASE_SCHEMA || DEFAULT_SCHEMA,
+    accountName: process.env.SUPABASE_ACCOUNT_NAME || DEFAULT_ACCOUNT_NAME,
+  };
+}
+
+function toNumber(value) {
+  if (value === null || value === undefined || value === "") return 0;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toNullableNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isoDateNDaysAgo(periodDays) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - Math.max(periodDays - 1, 0));
+  return date.toISOString().slice(0, 10);
+}
+
+function share(count, total) {
+  if (!total) return "0,0%";
+  return `${((count / total) * 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+function appendQuery(path, params) {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    searchParams.set(key, String(value));
+  }
+
+  return `${path}?${searchParams.toString()}`;
+}
+
+async function supabaseFetch(config, path, options = {}) {
+  const response = await fetch(`${config.url}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: config.key,
+      authorization: `Bearer ${config.key}`,
+      "accept-profile": config.schema,
+      "content-profile": config.schema,
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Supabase ${response.status}: ${detail.slice(0, 240)}`);
+  }
+
+  return response.json();
+}
+
+async function fetchAll(config, path) {
+  const rows = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const page = await supabaseFetch(config, path, {
+      headers: { range: `${from}-${from + PAGE_SIZE - 1}` },
+    });
+
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) {
+      return rows;
+    }
+  }
+}
+
+async function getAccount(config) {
+  const rows = await supabaseFetch(
+    config,
+    appendQuery("accounts", {
+      select: "id,account_name",
+      account_name: `eq.${config.accountName}`,
+      limit: 1,
+    }),
+  );
+
+  return rows[0] || null;
+}
+
+function buildCatalog(records) {
+  const total = new Set(records.map((record) => record.item_id).filter(Boolean)).size;
+  const current = records.filter((record) => record.catalog_source === "items_current").length;
+  const retained = records.filter((record) => record.catalog_source === "order_items_fallback").length;
+  const unknown = Math.max(total - current - retained, 0);
+
+  return {
+    total,
+    current,
+    retained,
+    unknown,
+    currentShare: total ? (current / total) * 100 : 0,
+    retainedShare: total ? (retained / total) * 100 : 0,
+    rows: [
+      {
+        source: "Catalogo operacional",
+        status: "Atualizado pela API",
+        count: current,
+        share: share(current, total),
+        tone: "good",
+      },
+      {
+        source: "Catalogo preservado",
+        status: "Mantido para analise",
+        count: retained,
+        share: share(retained, total),
+        tone: "warning",
+      },
+    ],
+  };
+}
+
+function buildSales(records) {
+  const totals = records.reduce(
+    (acc, record) => {
+      acc.visits += toNumber(record.visits);
+      acc.unitsSold += toNumber(record.units_sold);
+      acc.ordersCount += toNumber(record.orders_count);
+      acc.grossAmount += toNumber(record.gross_amount);
+      acc.paidGrossAmount += toNumber(record.paid_gross_amount);
+      return acc;
+    },
+    { visits: 0, unitsSold: 0, ordersCount: 0, grossAmount: 0, paidGrossAmount: 0 },
+  );
+  const dates = records.map((record) => record.performance_date).sort();
+
+  return {
+    visits: totals.visits,
+    unitsSold: totals.unitsSold,
+    ordersCount: totals.ordersCount,
+    grossAmount: totals.grossAmount,
+    paidGrossAmount: totals.paidGrossAmount,
+    avgTicket: totals.ordersCount ? totals.grossAmount / totals.ordersCount : null,
+    conversionRatePercent: totals.visits ? (totals.unitsSold / totals.visits) * 100 : null,
+    firstPerformanceDate: dates[0] || null,
+    lastPerformanceDate: dates.at(-1) || null,
+  };
+}
+
+function buildTopProducts(records) {
+  const byItem = new Map();
+
+  for (const record of records) {
+    if (!record.item_id) continue;
+
+    const current = byItem.get(record.item_id) || {
+      itemId: record.item_id,
+      title: record.title || record.item_id,
+      catalogSource: record.catalog_source || "unknown",
+      visits: 0,
+      unitsSold: 0,
+      ordersCount: 0,
+      grossAmount: 0,
+      conversionRatePercent: null,
+    };
+
+    current.visits += toNumber(record.visits);
+    current.unitsSold += toNumber(record.units_sold);
+    current.ordersCount += toNumber(record.orders_count);
+    current.grossAmount += toNumber(record.gross_amount);
+    current.conversionRatePercent = current.visits
+      ? (current.unitsSold / current.visits) * 100
+      : toNullableNumber(record.conversion_rate_percent);
+
+    byItem.set(record.item_id, current);
+  }
+
+  return Array.from(byItem.values())
+    .sort((a, b) => b.grossAmount - a.grossAmount)
+    .slice(0, 12);
+}
+
+const fallback = {
+  source: "fallback",
+  connected: false,
+  message: "Aguardando variaveis do Supabase.",
+  accountName: DEFAULT_ACCOUNT_NAME,
+  periodDays: 30,
+  catalog: {
+    total: 277,
+    current: 174,
+    retained: 103,
+    unknown: 0,
+    currentShare: 62.8,
+    retainedShare: 37.2,
+    rows: [
+      { source: "Catalogo operacional", status: "Atualizado pela API", count: 174, share: "62,8%", tone: "good" },
+      { source: "Catalogo preservado", status: "Mantido para analise", count: 103, share: "37,2%", tone: "warning" },
+    ],
+  },
+  sales: {
+    visits: null,
+    unitsSold: 1044,
+    ordersCount: 898,
+    grossAmount: 1763179.84,
+    paidGrossAmount: null,
+    avgTicket: 1963.45,
+    conversionRatePercent: null,
+    firstPerformanceDate: null,
+    lastPerformanceDate: "2026-02-25",
+  },
+  topProducts: [],
+};
+
+module.exports = async function handler(request, response) {
+  const requestedPeriod = Number(request.query.periodDays || 30);
+  const periodDays = [7, 30, 90].includes(requestedPeriod) ? requestedPeriod : 30;
+  const config = readConfig();
+
+  response.setHeader("Cache-Control", "no-store");
+
+  if (!config) {
+    return response.status(200).json({ ...fallback, periodDays });
+  }
+
+  try {
+    const account = await getAccount(config);
+
+    if (!account) {
+      return response.status(200).json({
+        ...fallback,
+        periodDays,
+        message: `Conta "${config.accountName}" nao encontrada no Supabase.`,
+      });
+    }
+
+    const accountFilter = `eq.${account.id}`;
+    const fromDate = isoDateNDaysAgo(periodDays);
+    const [catalogRecords, summaryRecords, performanceRecords] = await Promise.all([
+      fetchAll(
+        config,
+        appendQuery("dashboard_item_catalog", {
+          select: "item_id,catalog_source",
+          account_id: accountFilter,
+        }),
+      ),
+      fetchAll(
+        config,
+        appendQuery("dashboard_daily_account_summary", {
+          select:
+            "performance_date,visits,units_sold,orders_count,gross_amount,paid_gross_amount,avg_ticket,conversion_rate_percent",
+          account_id: accountFilter,
+          performance_date: `gte.${fromDate}`,
+          order: "performance_date.asc",
+        }),
+      ),
+      fetchAll(
+        config,
+        appendQuery("dashboard_daily_item_performance", {
+          select:
+            "item_id,title,catalog_source,visits,units_sold,orders_count,gross_amount,conversion_rate_percent",
+          account_id: accountFilter,
+          performance_date: `gte.${fromDate}`,
+        }),
+      ),
+    ]);
+
+    return response.status(200).json({
+      source: "supabase",
+      connected: true,
+      message: null,
+      accountName: account.account_name || config.accountName,
+      periodDays,
+      catalog: buildCatalog(catalogRecords),
+      sales: buildSales(summaryRecords),
+      topProducts: buildTopProducts(performanceRecords),
+    });
+  } catch (error) {
+    return response.status(200).json({
+      ...fallback,
+      periodDays,
+      message: error instanceof Error ? error.message : "Erro desconhecido ao consultar Supabase.",
+    });
+  }
+};
