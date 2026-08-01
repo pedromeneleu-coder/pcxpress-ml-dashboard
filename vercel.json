@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/dashboard.js": {
-      "runtime": "nodejs22.x"
-    }
-  }
-}
+{}
