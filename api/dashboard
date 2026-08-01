@@ -118,15 +118,15 @@ function buildCatalog(records) {
     retainedShare: total ? (retained / total) * 100 : 0,
     rows: [
       {
-        source: "Catalogo operacional",
+        source: "Catálogo operacional",
         status: "Atualizado pela API",
         count: current,
         share: share(current, total),
         tone: "good",
       },
       {
-        source: "Catalogo preservado",
-        status: "Mantido para analise",
+        source: "Catálogo preservado",
+        status: "Mantido para análise",
         count: retained,
         share: share(retained, total),
         tone: "warning",
@@ -198,7 +198,7 @@ function buildTopProducts(records) {
 const fallback = {
   source: "fallback",
   connected: false,
-  message: "Aguardando variaveis do Supabase.",
+  message: "Aguardando variáveis do Supabase.",
   accountName: DEFAULT_ACCOUNT_NAME,
   periodDays: 30,
   catalog: {
@@ -209,8 +209,8 @@ const fallback = {
     currentShare: 62.8,
     retainedShare: 37.2,
     rows: [
-      { source: "Catalogo operacional", status: "Atualizado pela API", count: 174, share: "62,8%", tone: "good" },
-      { source: "Catalogo preservado", status: "Mantido para analise", count: 103, share: "37,2%", tone: "warning" },
+      { source: "Catálogo operacional", status: "Atualizado pela API", count: 174, share: "62,8%", tone: "good" },
+      { source: "Catálogo preservado", status: "Mantido para análise", count: 103, share: "37,2%", tone: "warning" },
     ],
   },
   sales: {
@@ -227,6 +227,12 @@ const fallback = {
   topProducts: [],
 };
 
+function sendJson(response, status, payload) {
+  response.statusCode = status;
+  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.end(JSON.stringify(payload));
+}
+
 module.exports = async function handler(request, response) {
   const requestedPeriod = Number(request.query.periodDays || 30);
   const periodDays = [7, 30, 90].includes(requestedPeriod) ? requestedPeriod : 30;
@@ -235,17 +241,17 @@ module.exports = async function handler(request, response) {
   response.setHeader("Cache-Control", "no-store");
 
   if (!config) {
-    return response.status(200).json({ ...fallback, periodDays });
+    return sendJson(response, 200, { ...fallback, periodDays });
   }
 
   try {
     const account = await getAccount(config);
 
     if (!account) {
-      return response.status(200).json({
+      return sendJson(response, 200, {
         ...fallback,
         periodDays,
-        message: `Conta "${config.accountName}" nao encontrada no Supabase.`,
+        message: `Conta "${config.accountName}" não encontrada no Supabase.`,
       });
     }
 
@@ -280,7 +286,7 @@ module.exports = async function handler(request, response) {
       ),
     ]);
 
-    return response.status(200).json({
+    return sendJson(response, 200, {
       source: "supabase",
       connected: true,
       message: null,
@@ -291,7 +297,7 @@ module.exports = async function handler(request, response) {
       topProducts: buildTopProducts(performanceRecords),
     });
   } catch (error) {
-    return response.status(200).json({
+    return sendJson(response, 200, {
       ...fallback,
       periodDays,
       message: error instanceof Error ? error.message : "Erro desconhecido ao consultar Supabase.",
